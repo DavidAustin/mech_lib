@@ -9,6 +9,66 @@ aluminium_colour = [0.77, 0.77, 0.8]
 steel_colour = [0.7, 0.7, 0.7]#[0.8, 0.8, 0.8]
 
 
+
+class AssemblyBase(object):
+
+    def __init__(self, name, data):
+        self.name = name
+        self.data = data
+        self.parent = None
+        self.children = []
+        
+
+    def add_child(self, child):
+        self.children.append(child)
+        child.set_parent(self)
+
+    def add_children(self, *args):
+        for a in args:
+            if isinstance(a, (list,tuple)):
+                self.add_children(*a)
+            else:
+                self.add_child(a)       
+
+    def set_parent(self, parent):
+        self.parent = parent
+
+
+    def get_data(self, key, default=None):
+        data_depth = self.get_data_depth(key)
+        if len(data_depth) > 0:
+            data_depth.sort(key=lambda e: e[1])
+            return data_depth[0][0]
+        
+        ud = self.get_data_up(key)
+        if ud is not None:
+            return ud
+        else:
+            return default
+
+    def get_data_depth(self, key, depth=0):
+        if key in self.data:
+            return [(self.data[key], depth)]
+        else:
+            ret = []
+            for c in self.children:
+                dd = c.get_data_depth(key, depth+1)
+                if dd is not None:
+                    ret += dd
+            return ret
+
+    def get_data_up(self, key):
+        if key in self.data:
+            return self.data[key]
+        elif self.parent is None:
+            return None
+        else:
+            return self.parent.get_data_up(key)
+        
+    def generate(self):
+        raise NotImplementedError, "Should be overridden"
+
+
 def mirror_points_x(pts, x_val):
     r = []
     for x,y in pts:
@@ -23,6 +83,16 @@ def shift_points(pts, s):
         x += s[0]
         y += s[1]
         r.append([x, y])
+    return r
+
+def rotate_points(pts, angle):
+    ca = math.cos(angle)
+    sa = math.sin(angle)
+    r = []
+    for x,y in pts:
+        nx = x * ca - y * sa
+        ny = x * sa + y * ca
+        r.append([nx, ny])
     return r
     
 
@@ -146,6 +216,35 @@ def beam40x20(l):
         beam
     )
 
+
+def beam40x40(l):
+    pts = [
+        [5.5, 4.1],
+        [5.5, -4.1],
+        [13.0, -10.25],
+        [18.2, -10.25],
+        [18.2, -6.4],
+        [15.5, -6.4],
+        [15.5, -4.1],
+        [20.0, -4.1],
+        [20.0, -20.0],
+        [4.1, -20.0],
+        [4.1, -15.5],
+        [6.4, -15.5],
+        [6.4, -18.2],
+        [10.25, -18.2],
+        [10.25, -13.0],
+        [4.1, -5.5],
+    ]
+
+    all_pts = (pts + rotate_points(pts, math.radians(90))
+               + rotate_points(pts, math.radians(180)) 
+               + rotate_points(pts, math.radians(270)))
+    beam = linear_extrude(l)(polygon(all_pts))
+                                           
+    return color(aluminium_colour)( 
+        beam
+    )
 
 
 def mgn12_rail(l):
