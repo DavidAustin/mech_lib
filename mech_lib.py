@@ -17,7 +17,6 @@ class AssemblyBase(object):
         self.data = data
         self.parent = None
         self.children = []
-        
 
     def add_child(self, child):
         self.children.append(child)
@@ -33,6 +32,11 @@ class AssemblyBase(object):
     def set_parent(self, parent):
         self.parent = parent
 
+    def get_top(self):
+        if self.parent is None:
+            return self
+        else:
+            return self.parent.get_top()
 
     def get_data(self, key, default=None):
         data_depth = self.get_data_depth(key)
@@ -47,6 +51,7 @@ class AssemblyBase(object):
             return default
 
     def get_data_depth(self, key, depth=0):
+        #print key, depth, self.name
         if key in self.data:
             return [(self.data[key], depth)]
         else:
