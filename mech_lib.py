@@ -9,6 +9,7 @@ aluminium_colour = [0.77, 0.77, 0.8]
 steel_colour = [0.7, 0.7, 0.7]#[0.8, 0.8, 0.8]
 
 
+TransparentYellow = (1, 1, 0, 0.3)
 
 class AssemblyBase(object):
 
@@ -524,3 +525,111 @@ def lm10uu():
         )
     )
     return color(Steel)(u)
+
+
+def nema(size=23, l=76.0, shaft_dia=8.0):
+    if size == 23:
+        w = 57.0
+    else:
+        raise NotImplementedError
+
+    return union()(
+        color(Black)(
+            translate([-w/2,-w/2,-l])(
+                cube([w,w,l])
+            ),
+        ),
+        color(Steel)(
+            cylinder(r=shaft_dia/2, h=21.0)
+        )
+    )
+
+
+def bk10():
+    return color(Black)(
+        difference()(
+            union()(
+                translate([-22.0, -30.0, 0.0])(
+                    cube([32.5, 60.0, 25.0])
+                ),
+                translate([-34.0/2, -34.0/2, 0.0])(
+                    cube([34.0, 34.0, 30.0])
+                )
+            ),
+            translate([0,0,-1])(
+                cylinder(r=10.0/2, h=32.0)
+            )
+        )
+    )
+
+def bf10():
+    return color(Black)(
+        difference()(
+            union()(
+                translate([-22.0, -30.0, 0.0])(
+                    cube([32.5, 60.0, 20.0])
+                ),
+                translate([-34.0/2, -34.0/2, 0.0])(
+                    cube([34.0, 34.0, 20.0])
+                )
+            ),
+            translate([0,0,-1])(
+                cylinder(r=8.0/2, h=22.0)
+            )
+        )
+    )
+
+
+def fk10():
+    return color(Black)(
+        difference()(
+            union()(
+                translate([-42.0/2, -42.0/2, 17.0])(
+                    cube([42.0, 42.0, 10.0])
+                ),
+                cylinder(r=34.0/2, h=17.0 + 1.0)
+            ),
+            translate([0,0,-1])(
+                cylinder(r=10.0/2, h=29.0)
+            )
+        )
+    )
+
+def ff10():
+    return color(Black)(
+        difference()(
+            union()(
+                translate([-35.0/2, -35.0/2, 5.0])(
+                    cube([35.0, 35.0, 7.0])
+                ),
+                cylinder(r=28.0/2, h=5.0 + 1.0)
+            ),
+            translate([0,0,-1])(
+                cylinder(r=8.0/2, h=14.0)
+            )
+        )
+    )
+
+
+def gt2_pulley(nt, shaft_dia=8.0, belt_width=6.0):
+    d = nt * 2 / math.pi
+    ed = 16 / 12.7 * d
+    hub_h = 8.0
+    u = union()(
+        cylinder(r=ed/2, h=hub_h),
+        translate([0.0, 0.0, hub_h-0.5])(
+            cylinder(r=d/2, h=belt_width+1+1.0)
+        ),
+        translate([0.0, 0.0, hub_h + belt_width + 1])(
+            cylinder(r=ed/2, h=1.0),
+        )
+    )
+
+    u = difference()(
+        u,
+        translate([0,0,-1])(
+            cylinder(r=shaft_dia/2, h=hub_h + belt_width + 2)
+        )
+    )
+    return color(aluminium_colour)(u)
+
