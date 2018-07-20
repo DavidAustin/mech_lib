@@ -633,3 +633,19 @@ def gt2_pulley(nt, shaft_dia=8.0, belt_width=6.0):
     )
     return color(aluminium_colour)(u)
 
+def sk12():
+    u = union()(
+        translate([-20.0/2, -23, 0.0])(
+            cube([20.0, 37.5, 14.0])
+        ),
+        translate([-42.0/2, -23, 0.0])(
+            cube([42.0, 6.0, 14.0])
+        )
+    )
+    u = difference()(
+        u,
+        translate([0,0,-1])(
+            cylinder(r=12.0/2, h=16)
+        )
+    )
+    return color(aluminium_colour)(u)
