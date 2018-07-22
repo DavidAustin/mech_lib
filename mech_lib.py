@@ -649,3 +649,39 @@ def sk12():
         )
     )
     return color(aluminium_colour)(u)
+
+
+class SFU1204ScrewAssembly(AssemblyBase):
+    
+    def __init__(self, data={}):
+        defaults = {
+            'fixed_nut_type' : 'bk',
+            'floating_nut_type' : 'bf',
+            'length' : 300.0
+        }
+        defaults.update(data)
+        AssemblyBase.__init__(self, "SFU1204ScrewAssembly", defaults)
+
+    def generate(self):
+
+        screw_len = self.data['length']
+        screw = sfu1204_screw(screw_len)
+        screw_fixed_pos = 39.0 + 15.0
+        if self.data['fixed_nut_type'] == 'bk':
+            kn = translate([0,0,screw_fixed_pos-30])(bk10())
+        elif self.data['fixed_nut_type'] == 'fk':
+            kn = translate([0,0,screw_fixed_pos-27])(fk10())
+        else:
+            raise NotImplementedError
+
+        
+        screw_float_pos = screw_len - 10.0
+        if self.data['floating_nut_type'] == 'bf':
+            fn = translate([0,0,screw_float_pos])(bf10())
+        elif self.data['floating_nut_type'] == 'ff':
+            fn = translate([0,0,screw_float_pos+12.0])(mirror([0,0,1])(ff10()))
+        else:
+            raise NotImplementedError
+
+        return screw + kn + fn
+    
