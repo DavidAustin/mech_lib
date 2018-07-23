@@ -18,6 +18,9 @@ class AssemblyBase(object):
         self.data = data
         self.parent = None
         self.children = []
+        self.calculated = False
+        self.identifier = name
+        self.id_dict = {}
 
     def add_child(self, child):
         self.children.append(child)
@@ -70,11 +73,81 @@ class AssemblyBase(object):
             return None
         else:
             return self.parent.get_data_up(key)
+
+    def finalise_calcs(self, tries=5, exception_on_fail=True):
+        while tries >= 0:
+            if self.recalculate(show_errors=(tries==0)):
+                return True
+            tries -= 1
+        if exception_on_fail:
+            raise RuntimeError, "finalise_calcs failed"
+        else:
+            return False
+    
+    def recalculate(self, show_errors=False):
+        done = True
+        for c in self.children:
+            r = c.recalculate(show_errors=show_errors)
+            if not r:
+                if show_errors:
+                    print "Recalculate failed for %s" % c.name
+                done = False
+        r = self.check_calculate()
+        if not r:
+            if show_errors:
+                print "Calculate failed for %s" % self.name
+            done = False
+        return done
+
+    def check_calculate(self):
+        if self.calculated:
+            return True
+        r = self.calculate()
+        if r:
+            self.calculated = r
+        return r
+    
+    def calculate(self):
+        return False
         
     def generate(self):
         raise NotImplementedError, "Should be overridden"
 
+    def make_id(self, basename):
+        i = 0
+        while basename + str(i) in self.get_top().id_dict:
+            i += 1
+        ret = basename + str(i)
+        self.get_top().id_dict[ret] = 1
+        return ret
 
+    def gen_unique_ids(self):
+        self.identifier = self.make_id(self.name)
+        for c in self.children:
+            c.gen_unique_ids()
+    
+    def make_bom(self):
+        self.get_top().gen_unique_ids()
+        ret = []
+        self.do_make_bom(ret)
+        return ret
+
+    def do_make_bom(self, l):
+        l.append({'name': self.name,
+                  'identifier' : self.identifier,
+                  'data' : self.data,
+                  'assembly' : len(self.children) > 0})
+        for c in self.children:
+            c.do_make_bom(l)
+    
+def print_bom(bom):
+    for d in bom:
+        if not d['assembly']:
+            print d['identifier'], d['name'], d['data']
+    for d in bom:
+        if d['assembly']:
+            print d['identifier'], d['name'], d['data']
+        
 def mirror_points_x(pts, x_val):
     r = []
     for x,y in pts:
@@ -251,6 +324,19 @@ def beam40x40(l):
     return color(aluminium_colour)( 
         beam
     )
+
+class Beam40x40(AssemblyBase):
+    def __init__(self, data={}):
+        defaults = {
+        }
+        defaults.update(data)
+        AssemblyBase.__init__(self, "Beam40x40", defaults)
+
+    def calculate(self):
+        return True
+
+    def generate(self):
+        return beam40x40(self.data['length'])
 
 
 def mgn12_rail(l):
@@ -662,24 +748,26 @@ class SFU1204ScrewAssembly(AssemblyBase):
         defaults.update(data)
         AssemblyBase.__init__(self, "SFU1204ScrewAssembly", defaults)
 
+    def calculate(self):
+        self.data['screw_len'] = self.data['length']
+        self.data['screw_fixed_pos'] = 39.0 + 15.0
+        self.data['screw_float_pos'] = self.data['screw_len'] - 10.0
+        return True
+        
     def generate(self):
-
-        screw_len = self.data['length']
-        screw = sfu1204_screw(screw_len)
-        screw_fixed_pos = 39.0 + 15.0
+        screw = sfu1204_screw(self.data['screw_len'])
         if self.data['fixed_nut_type'] == 'bk':
-            kn = translate([0,0,screw_fixed_pos-30])(bk10())
+            kn = translate([0,0,self.data['screw_fixed_pos']-30])(bk10())
         elif self.data['fixed_nut_type'] == 'fk':
-            kn = translate([0,0,screw_fixed_pos-27])(fk10())
+            kn = translate([0,0,self.data['screw_fixed_pos']-27])(fk10())
         else:
             raise NotImplementedError
-
         
-        screw_float_pos = screw_len - 10.0
         if self.data['floating_nut_type'] == 'bf':
-            fn = translate([0,0,screw_float_pos])(bf10())
+            fn = translate([0,0,self.data['screw_float_pos']])(bf10())
         elif self.data['floating_nut_type'] == 'ff':
-            fn = translate([0,0,screw_float_pos+12.0])(mirror([0,0,1])(ff10()))
+            fn = translate([0,0,self.data['screw_float_pos']+12.0])(
+                mirror([0,0,1])(ff10()))
         else:
             raise NotImplementedError
 
