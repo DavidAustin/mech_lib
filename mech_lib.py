@@ -19,12 +19,16 @@ class AssemblyBase(object):
         self.parent = None
         self.children = []
         self.calculated = False
+        self.calculating = False
         self.identifier = name
         self.id_dict = {}
 
     def add_child(self, child):
-        self.children.append(child)
+        self.children.append(child)        
         child.set_parent(self)
+        if self.calculating:
+            child.calculate()
+                            
 
     def add_children(self, *args):
         for a in args:
@@ -102,7 +106,9 @@ class AssemblyBase(object):
     def check_calculate(self):
         if self.calculated:
             return True
+        self.calculating = True
         r = self.calculate()
+        self.calculating = False
         if r:
             self.calculated = r
         return r
@@ -115,9 +121,9 @@ class AssemblyBase(object):
 
     def make_id(self, basename):
         i = 0
-        while basename + str(i) in self.get_top().id_dict:
+        while basename + '_' + str(i) in self.get_top().id_dict:
             i += 1
-        ret = basename + str(i)
+        ret = basename + '_' + str(i)
         self.get_top().id_dict[ret] = 1
         return ret
 
@@ -144,6 +150,7 @@ def print_bom(bom):
     for d in bom:
         if not d['assembly']:
             print d['identifier'], d['name'], d['data']
+    print ''
     for d in bom:
         if d['assembly']:
             print d['identifier'], d['name'], d['data']
@@ -173,7 +180,25 @@ def rotate_points(pts, angle):
         ny = x * sa + y * ca
         r.append([nx, ny])
     return r
-    
+
+
+class GenericRectangularPrism(AssemblyBase):
+    def __init__(self, name, data={}):
+        defaults = {
+        }
+        defaults.update(data)
+        AssemblyBase.__init__(self, name, defaults)
+
+    def calculate(self):
+        return True
+
+    def generate(self):
+        colour = self.get_data('colour', Yellow)
+        width = self.get_data('width')
+        height = self.get_data('height')
+        depth = self.get_data('depth')
+        return color(colour)(cube([width, depth, height]))
+
 
 def metric_bolt(d, l, style='socket_head'):
     r = float(d)/2.0
@@ -423,6 +448,24 @@ def shaft(dia=10.0, length=300.0):
     return color(steel_colour)(cylinder(r=float(dia)/2, h=length))
 
 
+class GenericShaft(AssemblyBase):
+    def __init__(self, name, data={}):
+        defaults = {
+        }
+        defaults.update(data)
+        AssemblyBase.__init__(self, name, defaults)
+
+    def calculate(self):
+        return True
+
+    def generate(self):
+        colour = self.get_data('colour', Yellow)
+        dia = self.get_data('dia')
+        length = self.get_data('length')
+        return color(colour)(cylinder(r=float(dia)/2, h=length))
+
+
+
 
 def linear_bearing_block_sc10uu():
     pts = [
@@ -556,6 +599,19 @@ def sfu1204_screw(l, show_thread=False):
     )
     return color(Steel)(u)
 
+class SFU1204Screw(AssemblyBase):
+    def __init__(self, data={}):
+        defaults = {            
+        }
+        defaults.update(data)
+        AssemblyBase.__init__(self, 'SFU1204Screw', defaults)
+        
+    def calculate(self):
+        return True
+
+    def generate(self):
+        return sfu1204_screw(self.get_data('length'))
+
 def sfu1204_nut(show_thread=False):
     u = union()(
         cylinder(r=42.0/2, h=8.0),
@@ -585,6 +641,20 @@ def sfu1204_nut(show_thread=False):
     )
     return color(Steel)(u)
 
+class SFU1204Nut(AssemblyBase):
+    def __init__(self, data={}):
+        defaults = {
+        }
+        defaults.update(data)
+        AssemblyBase.__init__(self, 'SFU1204Nut', defaults)
+        
+    def calculate(self):
+        return True
+
+    def generate(self):
+        return sfu1204_nut()
+
+
 def lm12uu():
     u = difference()(
         cylinder(r=21.0/2, h=30.0),
@@ -612,6 +682,20 @@ def lm10uu():
     )
     return color(Steel)(u)
 
+class LM10UU(AssemblyBase):
+    def __init__(self, data={}):
+        defaults = {
+        }
+        defaults.update(data)
+        AssemblyBase.__init__(self, 'LM10UU', defaults)
+        
+    def calculate(self):
+        return True
+
+    def generate(self):
+        return lm10uu()
+
+    
 
 def nema(size=23, l=76.0, shaft_dia=8.0):
     if size == 23:
@@ -648,6 +732,20 @@ def bk10():
         )
     )
 
+class BK10Bearing(AssemblyBase):
+    def __init__(self, data={}):
+        defaults = {
+        }
+        defaults.update(data)
+        AssemblyBase.__init__(self, 'BK10', defaults)
+        
+    def calculate(self):
+        return True
+
+    def generate(self):
+        return bk10()
+
+
 def bf10():
     return color(Black)(
         difference()(
@@ -665,6 +763,19 @@ def bf10():
         )
     )
 
+class BF10Bearing(AssemblyBase):
+    def __init__(self, data={}):
+        defaults = {
+        }
+        defaults.update(data)
+        AssemblyBase.__init__(self, 'BF10', defaults)
+        
+    def calculate(self):
+        return True
+
+    def generate(self):
+        return bf10()
+
 
 def fk10():
     return color(Black)(
@@ -681,6 +792,20 @@ def fk10():
         )
     )
 
+class FK10Bearing(AssemblyBase):
+    def __init__(self, data={}):
+        defaults = {
+        }
+        defaults.update(data)
+        AssemblyBase.__init__(self, 'FK10', defaults)
+        
+    def calculate(self):
+        return True
+
+    def generate(self):
+        return fk10()
+
+
 def ff10():
     return color(Black)(
         difference()(
@@ -696,7 +821,21 @@ def ff10():
         )
     )
 
+class FF10Bearing(AssemblyBase):
+    def __init__(self, data={}):
+        defaults = {
+        }
+        defaults.update(data)
+        AssemblyBase.__init__(self, 'FF10', defaults)
+        
+    def calculate(self):
+        return True
 
+    def generate(self):
+        return ff10()
+
+
+    
 def gt2_pulley(nt, shaft_dia=8.0, belt_width=6.0):
     d = nt * 2 / math.pi
     ed = 16 / 12.7 * d
@@ -752,24 +891,51 @@ class SFU1204ScrewAssembly(AssemblyBase):
         self.data['screw_len'] = self.data['length']
         self.data['screw_fixed_pos'] = 39.0 + 15.0
         self.data['screw_float_pos'] = self.data['screw_len'] - 10.0
+        self.screw = SFU1204Screw({'length' : self.data['screw_len']})
+        self.add_child(self.screw)
+        
+        if self.data['fixed_nut_type'] == 'bk':
+            self.fixed_nut = BK10Bearing()
+        elif self.data['fixed_nut_type'] == 'fk':
+            self.fixed_nut = FK10Bearing()
+        else:
+            raise NotImplementedError
+
+        self.add_child(self.fixed_nut)
+
+        if self.data['floating_nut_type'] == 'bf':
+            self.floating_nut = BF10Bearing()
+        elif self.data['floating_nut_type'] == 'ff':
+            self.floating_nut = FF10Bearing()
+        else:
+            raise NotImplementedError
+        self.add_child(self.floating_nut)
+
         return True
         
     def generate(self):
-        screw = sfu1204_screw(self.data['screw_len'])
         if self.data['fixed_nut_type'] == 'bk':
-            kn = translate([0,0,self.data['screw_fixed_pos']-30])(bk10())
+            kn = translate([0,0,self.data['screw_fixed_pos']-30])(
+                self.fixed_nut.generate()
+            )
         elif self.data['fixed_nut_type'] == 'fk':
-            kn = translate([0,0,self.data['screw_fixed_pos']-27])(fk10())
+            kn = translate([0,0,self.data['screw_fixed_pos']-27])(
+                self.fixed_nut.generate()
+            )
         else:
             raise NotImplementedError
         
         if self.data['floating_nut_type'] == 'bf':
-            fn = translate([0,0,self.data['screw_float_pos']])(bf10())
+            fn = translate([0,0,self.data['screw_float_pos']])(
+                self.floating_nut.generate()
+            )
         elif self.data['floating_nut_type'] == 'ff':
             fn = translate([0,0,self.data['screw_float_pos']+12.0])(
-                mirror([0,0,1])(ff10()))
+                mirror([0,0,1])(
+                    self.floating_nut.generate()
+                ))
         else:
             raise NotImplementedError
 
-        return screw + kn + fn
+        return self.screw.generate() + kn + fn
     
