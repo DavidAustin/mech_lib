@@ -531,6 +531,20 @@ def sbr12(l):
 
     return color(steel_colour)(u)
 
+class SBR12(AssemblyBase):
+    def __init__(self, data={}):
+        defaults = {
+        }
+        defaults.update(data)
+        AssemblyBase.__init__(self, 'SBR12', defaults)
+        
+    def calculate(self):
+        return True
+
+    def generate(self):
+        return sbr12(self.get_data('length'))
+
+
 def sbr12uu():
     pts = [
         [8.5/2, 7.0],
@@ -574,6 +588,18 @@ def sbr12uu():
     )
     return color(aluminium_colour)(u)
 
+class SBR12UU(AssemblyBase):
+    def __init__(self, data={}):
+        defaults = {
+        }
+        defaults.update(data)
+        AssemblyBase.__init__(self, 'SBR12UU', defaults)
+        
+    def calculate(self):
+        return True
+
+    def generate(self):
+        return sbr12uu()
 
 def sfu1204_screw(l, show_thread=False):
     thread_len = l - 15 - 39 - 10
@@ -663,6 +689,19 @@ def lm12uu():
         )
     )
     return color(Steel)(u)
+
+class LM12UU(AssemblyBase):
+    def __init__(self, data={}):
+        defaults = {
+        }
+        defaults.update(data)
+        AssemblyBase.__init__(self, 'LM12UU', defaults)
+        
+    def calculate(self):
+        return True
+
+    def generate(self):
+        return lm12uu()
 
 def lm12luu():
     u = difference()(
@@ -874,6 +913,19 @@ def sk12():
         )
     )
     return color(aluminium_colour)(u)
+
+class SK12(AssemblyBase):
+    def __init__(self, data={}):
+        defaults = {
+        }
+        defaults.update(data)
+        AssemblyBase.__init__(self, 'SK12', defaults)
+        
+    def calculate(self):
+        return True
+
+    def generate(self):
+        return sk12()
 
 
 class SFU1204ScrewAssembly(AssemblyBase):
