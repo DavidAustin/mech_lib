@@ -465,6 +465,48 @@ class GenericShaft(AssemblyBase):
         return color(colour)(cylinder(r=float(dia)/2, h=length))
 
 
+class GenericBearing(AssemblyBase):
+    def __init__(self, data={}):
+        defaults = {
+        }
+        defaults.update(data)
+        AssemblyBase.__init__(self, 'Bearing', defaults)
+
+    def calculate(self):
+        return True
+
+    def generate(self):
+        ind = self.data['bearing_id']
+        od = self.data['bearing_od']
+        t = self.data['thickness']
+        dr = float(od)/2/8
+        u = union()(
+            color(Steel)(
+                difference()(
+                    cylinder(r=float(od)/2,h=t),
+                    translate([0,0,-1])(
+                        cylinder(r=float(od)/2 - dr, h=t+2)
+                    )
+                ),
+                difference()(
+                    cylinder(r=float(ind)/2+dr, h=t),
+                    translate([0,0,-1])(
+                        cylinder(r=float(ind)/2, h=t+2)
+                    )
+                )
+            ),
+            color(Black)(
+                difference()(
+                    cylinder(r=float(od)/2 - dr/2, h=t*0.9),
+                    translate([0,0,-1])(
+                        cylinder(r=float(ind)/2+dr/2, h=t+2),
+                    )
+                )
+            )
+        )
+        return u
+
+    
 
 
 def linear_bearing_block_sc10uu():
@@ -991,3 +1033,59 @@ class SFU1204ScrewAssembly(AssemblyBase):
 
         return self.screw.generate() + kn + fn
     
+
+class MetricNut(AssemblyBase):
+
+    def __init__(self, data={}):
+        defaults = {
+        }
+        defaults.update(data)
+        AssemblyBase.__init__(self, "M%dNut" % defaults['thread_size'],
+                              defaults)
+
+    
+    def calculate(self):        
+        self.inner_r = float(self.data['thread_size'])/2
+        code = int(float(self.data['thread_size'] * 10) + 0.5)
+        self.outer_r = {
+            16 : 3.41,
+            20 : 4.32,
+            25 : 5.45,
+            30 : 6.01,
+            40 : 7.66,
+            50 : 8.79,
+            60 : 11.05,
+            80 : 14.38,
+            100 : 17.77,
+            120 : 20.03,
+            140 : 23.35,
+            160 : 26.75,
+            200 : 32.95
+        }[code] / 2
+        self.height = {
+            16 : 1.3,
+            20 : 1.6,
+            25 : 2.0,
+            30 : 2.4,
+            40 : 3.2,
+            50 : 4.7,
+            60 : 5.2,
+            80 : 6.8,
+            100 : 8.4,
+            120 : 10.8,
+            140 : 12.8,
+            160 : 14.8,
+            200 : 18.0
+        }[code]
+        return True
+        
+    def generate(self):
+        return color(Steel)(
+            difference()(
+                cylinder(r=self.outer_r, h=self.height,
+                         segments=6),
+                translate([0,0,-1])(
+                    cylinder(r=self.inner_r, h=self.height+2)
+                )
+            )
+        )
