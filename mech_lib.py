@@ -11,6 +11,15 @@ steel_colour = [0.7, 0.7, 0.7]#[0.8, 0.8, 0.8]
 
 TransparentYellow = (1, 1, 0, 0.3)
 
+
+def make_routed_slot(pts, tool_dia):
+    import shapely
+    import shapely.geometry
+    l = shapely.geometry.LineString(pts)
+    p = l.buffer(distance=tool_dia/2, resolution=2)#, cap_style=1, join_style=1)
+    pts = [(e[0],e[1]) for e in p.exterior.coords]
+    return pts
+
 class AssemblyBase(object):
 
     def __init__(self, name, data):
