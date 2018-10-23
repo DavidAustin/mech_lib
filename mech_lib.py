@@ -1,3 +1,11 @@
+# TODO -
+# * each part write it's parameters to a pickle (in a sub-dir)
+# * each part able to run openscad to generate itself (scad, stl, csg)
+#   (in a sub-dir)
+# * BOM generation (spreadsheeet, csv?)
+# * interfacing between parts - able to specify mating constraints/locations
+#   and assemble by those.
+
 import sys
 import os
 import math
@@ -208,6 +216,32 @@ class GenericRectangularPrism(AssemblyBase):
         depth = self.get_data('depth')
         return color(colour)(cube([width, depth, height]))
 
+class GenericDrilledPlate(AssemblyBase):
+    def __init__(self, name, data={}):
+        defaults = {            
+        }
+        defaults.update(data)
+        AssemblyBase.__init__(self, name, defaults)
+
+    def calculate(self):
+        return True
+
+    def generate(self):
+        colour = self.get_data('colour', Yellow)
+        width = self.get_data('width')
+        height = self.get_data('height')
+        depth = self.get_data('depth')
+        drills = self.get_data('drills', [])
+        u = cube([width, depth, height])
+        dl = []
+        for x,y,dia in drills:
+            dl.append(translate([x,y,-1])(cylinder(r=float(dia)/2,
+                                                   h = height+2)))
+        u = difference()(
+            u,
+            *dl
+        )
+        return color(colour)(u)
 
 def metric_bolt(d, l, style='socket_head'):
     r = float(d)/2.0
