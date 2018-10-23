@@ -1,5 +1,4 @@
 # TODO -
-# * each part write it's parameters to a pickle (in a sub-dir)
 # * each part able to run openscad to generate itself (scad, stl, csg)
 #   (in a sub-dir)
 # * BOM generation (spreadsheeet, csv?)
@@ -12,6 +11,7 @@ import math
 from solid import *
 from solid.utils import *
 from solid import screw_thread
+import pickle
 
 aluminium_colour = [0.77, 0.77, 0.8]
 steel_colour = [0.7, 0.7, 0.7]#[0.8, 0.8, 0.8]
@@ -136,16 +136,36 @@ class AssemblyBase(object):
     def generate(self):
         raise NotImplementedError, "Should be overridden"
 
-    def make_id(self, basename):
-        i = 0
-        while basename + '_' + str(i) in self.get_top().id_dict:
-            i += 1
-        ret = basename + '_' + str(i)
-        self.get_top().id_dict[ret] = 1
-        return ret
-
+    def make_id(self):
+        basename = self.identifier
+        id_dict = self.get_top().id_dict
+        t = basename
+        d = id_dict.get(t, None)
+        if d is self:
+            return None
+        elif d is None:
+            id_dict[t] = self
+            self.identifier = t
+            print '%s:Allocating new id %s to %s' % (
+                self.get_top().identifier, t, self
+            )
+        else:
+            i = 0
+            while True:
+                t = basename + '_' + str(i)
+                d = id_dict.get(t, None)
+                if d is self or d is None:
+                    break
+                
+                i += 1
+            print '%s:Allocating new id %s to %s' % (
+                self.get_top().identifier, t, self
+            )
+            id_dict[t] = self
+            self.identifier = t
+        
     def gen_unique_ids(self):
-        self.identifier = self.make_id(self.name)
+        self.make_id()
         for c in self.children:
             c.gen_unique_ids()
     
@@ -162,7 +182,32 @@ class AssemblyBase(object):
                   'assembly' : len(self.children) > 0})
         for c in self.children:
             c.do_make_bom(l)
-    
+
+
+    def save_data(self, output_dir):
+        self.get_top().gen_unique_ids()
+        self.get_top().do_save(output_dir)
+
+    def do_save(self, output_dir):
+        ofn = os.path.join(output_dir, '%s.pickle' %  (self.identifier))
+        pickle.dump(self.data, open(ofn, 'w'))
+        for c in self.children:
+            c.do_save(output_dir)
+        
+    def save_components(self, output_dir):
+        self.get_top().gen_unique_ids()
+        self.get_top().do_save_components(output_dir)
+
+    def do_save_components(self, output_dir):
+        ofn = os.path.join(output_dir, '%s.scad' %  (self.identifier))
+        pickle.dump(self.data, open(ofn, 'w'))
+        scad_render_to_file(self.generate(),
+                            filepath=ofn,
+                            include_orig_code=True,
+                            file_header='$fa = %s; $fn = %s;' % (40, 40))
+        for c in self.children:
+            c.do_save_components(output_dir)
+        
 def print_bom(bom):
     for d in bom:
         if not d['assembly']:
