@@ -1,4 +1,5 @@
 # TODO -
+# * search for data by component name too - generally refactor data search?
 # * each part able to run openscad to generate itself (scad, stl, csg)
 #   (in a sub-dir)
 # * BOM generation (spreadsheeet, csv?)
@@ -65,7 +66,7 @@ class AssemblyBase(object):
 
     def get_data(self, key, default=None):
         data_depth = self.get_data_depth(key)
-        if len(data_depth) > 0:
+        if len(data_depth) > 0:            
             data_depth.sort(key=lambda e: e[1])
             return data_depth[0][0]
         
@@ -74,7 +75,7 @@ class AssemblyBase(object):
             return ud
         else:
             return default
-
+       
     def get_data_depth(self, key, depth=0):
         #print key, depth, self.name
         if key in self.data:
@@ -287,6 +288,40 @@ class GenericDrilledPlate(AssemblyBase):
             *dl
         )
         return color(colour)(u)
+
+
+
+class GenericRHS(AssemblyBase):
+    def __init__(self, name, data={}):
+        defaults = {            
+        }
+        defaults.update(data)
+        AssemblyBase.__init__(self, name, defaults)
+
+    def calculate(self):
+        return True
+
+    def generate(self):
+        colour = self.get_data('colour', Yellow)
+        width = self.get_data('width')
+        height = self.get_data('height')
+        length = self.get_data('length')
+        thickness = self.get_data('thickness')
+
+        pts = [
+            [0.0, 0.0],
+            [width, 0.0],
+            [width, thickness],
+            [thickness, thickness],
+            [thickness, height],
+            [0.0, height],
+            [0.0, 0.0]
+        ]
+        
+        u = linear_extrude(length, convexity=2)(polygon(pts))
+        
+        return color(colour)(u)
+
 
 def metric_bolt(d, l, style='socket_head'):
     r = float(d)/2.0
@@ -642,7 +677,7 @@ def linear_bearing_block_sc10uu():
     
     return color(aluminium_colour)(u)
 
-def sbr12(l):
+def sbr12(l, h = 20.46):
     
     pts = [
         [34.0/2, 0.0],
@@ -653,7 +688,7 @@ def sbr12(l):
         
     pts = pts + mirror_points_x(pts, 0.0)
 
-    pts = shift_points(pts, [0.0, -20.46])
+    pts = shift_points(pts, [0.0, -h])
 
     u = linear_extrude(l)(polygon(pts))
 
@@ -664,6 +699,7 @@ def sbr12(l):
 class SBR12(AssemblyBase):
     def __init__(self, data={}):
         defaults = {
+            'height_above_mounting_plane' : 20.46
         }
         defaults.update(data)
         AssemblyBase.__init__(self, 'SBR12', defaults)
@@ -672,7 +708,8 @@ class SBR12(AssemblyBase):
         return True
 
     def generate(self):
-        return sbr12(self.get_data('length'))
+        return sbr12(self.get_data('length'),
+                     h=self.get_data('height_above_mounting_plane'))
 
 
 def sbr12uu():
@@ -687,7 +724,7 @@ def sbr12uu():
 
     pts = shift_points(pts, [0.0, -27.6+17.0])
     
-    u = linear_extrude(39.0)(polygon(pts))
+    u = linear_extrude(39.0, convexity=4)(polygon(pts))
 
     u = difference()(
         u,
@@ -897,7 +934,36 @@ def bk10():
             ),
             translate([0,0,-1])(
                 cylinder(r=10.0/2, h=32.0)
+            ),
+            translate([-22.0, -46.0/2, -13.0/2+25.0/2])(
+                rotate([0,90,0])(
+                    translate([0,0,-1])(
+                        cylinder(r=5.5/2, h=39+1)
+                    )
+                )
+            ),
+            translate([-22.0, -46.0/2, 13.0/2+25.0/2])(
+                rotate([0,90,0])(
+                    translate([0,0,-1])(
+                        cylinder(r=5.5/2, h=39+1)
+                    )
+                )
+            ),
+            translate([-22.0, 46.0/2, -13.0/2+25.0/2])(
+                rotate([0,90,0])(
+                    translate([0,0,-1])(
+                        cylinder(r=5.5/2, h=39+1)
+                    )
+                )
+            ),
+            translate([-22.0, 46.0/2, 13.0/2+25.0/2])(
+                rotate([0,90,0])(
+                    translate([0,0,-1])(
+                        cylinder(r=5.5/2, h=39+1)
+                    )
+                )
             )
+            
         )
     )
 
@@ -928,6 +994,20 @@ def bf10():
             ),
             translate([0,0,-1])(
                 cylinder(r=8.0/2, h=22.0)
+            ),
+            translate([-22.0, 46.0/2, 20.0/2])(
+                rotate([0,90,0])(
+                    translate([0,0,-1])(
+                        cylinder(r=5.5/2, h=39+1)
+                    )
+                )
+            ),
+            translate([-22.0, -46.0/2, 20.0/2])(
+                rotate([0,90,0])(
+                    translate([0,0,-1])(
+                        cylinder(r=5.5/2, h=39+1)
+                    )
+                )
             )
         )
     )
@@ -1080,6 +1160,8 @@ class SFU1204ScrewAssembly(AssemblyBase):
             self.fixed_nut = BK10Bearing()
         elif self.data['fixed_nut_type'] == 'fk':
             self.fixed_nut = FK10Bearing()
+            self.data['screw_input_bearing_mounting_face'] = \
+                                  self.data['screw_fixed_pos'] - 10
         else:
             raise NotImplementedError
 
@@ -1089,6 +1171,8 @@ class SFU1204ScrewAssembly(AssemblyBase):
             self.floating_nut = BF10Bearing()
         elif self.data['floating_nut_type'] == 'ff':
             self.floating_nut = FF10Bearing()
+            self.data['screw_end_bearing_mounting_face'] = \
+                         self.data['screw_float_pos'] + 7
         else:
             raise NotImplementedError
         self.add_child(self.floating_nut)
