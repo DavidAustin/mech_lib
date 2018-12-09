@@ -270,6 +270,17 @@ class GenericDrilledPlate(AssemblyBase):
         AssemblyBase.__init__(self, name, defaults)
 
     def calculate(self):
+        nd = []
+        width = self.get_data('width')
+        depth = self.get_data('depth')
+        drills = self.get_data('drills', [])
+        for x,y,dia in drills:
+            if x < 0:
+                x = width + x
+            if y < 0:
+                y = depth + y
+            nd.append([x,y,dia])
+        self.data['drills'] = nd
         return True
 
     def generate(self):
@@ -817,7 +828,9 @@ def sfu1204_nut(show_thread=False):
                      h=35.0 - 10.0 - 8.0 + 0.1)
         )
     )
-    
+
+
+    drill = translate([0.0,16.0,-0.6])(cylinder(r=4.5/2, h=10.0))
     h1 = 30.0
     u = difference()(
         u,
@@ -830,7 +843,13 @@ def sfu1204_nut(show_thread=False):
         translate([0,0,-50])(
             cylinder(r=12.0/2,
                      h=60)
-        )
+        ),
+        drill,
+        rotate([0,0,45])(drill),
+        rotate([0,0,-45])(drill),
+        rotate([0,0,180])(drill),
+        rotate([0,0,180-45])(drill),
+        rotate([0,0,180+45])(drill),
     )
     return color(Steel)(u)
 
@@ -1037,6 +1056,26 @@ def fk10():
             ),
             translate([0,0,-1])(
                 cylinder(r=10.0/2, h=29.0)
+            ),
+            rotate([0,0,45])(
+                translate([42.0/2, 0, 16])(
+                    cylinder(r=4.0/2, h=14.0)
+                )
+            ),
+            rotate([0,0,45+90])(
+                translate([42.0/2, 0, 16])(
+                    cylinder(r=4.0/2, h=14.0)
+                )
+            ),
+            rotate([0,0,45+180])(
+                translate([42.0/2, 0, 16])(
+                    cylinder(r=4.0/2, h=14.0)
+                )
+            ),
+            rotate([0,0,45+270])(
+                translate([42.0/2, 0, 16])(
+                    cylinder(r=4.0/2, h=14.0)
+                )
             )
         )
     )
@@ -1066,6 +1105,26 @@ def ff10():
             ),
             translate([0,0,-1])(
                 cylinder(r=8.0/2, h=14.0)
+            ),
+            rotate([0,0,45])(
+                translate([35.0/2, 0, -1])(
+                    cylinder(r=4.0/2, h=14.0)
+                )
+            ),
+            rotate([0,0,45+90])(
+                translate([35.0/2, 0, -1])(
+                    cylinder(r=4.0/2, h=14.0)
+                )
+            ),
+            rotate([0,0,45+180])(
+                translate([35.0/2, 0, -1])(
+                    cylinder(r=4.0/2, h=14.0)
+                )
+            ),
+            rotate([0,0,45+270])(
+                translate([35.0/2, 0, -1])(
+                    cylinder(r=4.0/2, h=14.0)
+                )
             )
         )
     )
@@ -1120,7 +1179,17 @@ def sk12():
         u,
         translate([0,0,-1])(
             cylinder(r=12.0/2, h=16)
-        )
+        ),
+        translate([-32.0/2, -23.0+7, 14.0/2])(
+            rotate([90,0,0])(
+                cylinder(r=5.5/2, h=8)
+            )
+        ),
+        translate([32.0/2, -23.0+7, 14.0/2])(
+            rotate([90,0,0])(
+                cylinder(r=5.0/2, h=8)
+            )
+        ),
     )
     return color(aluminium_colour)(u)
 
