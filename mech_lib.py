@@ -13,6 +13,7 @@ from solid import *
 from solid.utils import *
 from solid import screw_thread
 import pickle
+import numpy as np
 
 aluminium_colour = [0.77, 0.77, 0.8]
 steel_colour = [0.7, 0.7, 0.7]#[0.8, 0.8, 0.8]
@@ -21,13 +22,257 @@ steel_colour = [0.7, 0.7, 0.7]#[0.8, 0.8, 0.8]
 TransparentYellow = (1, 1, 0, 0.3)
 
 
+def radial_extrude(pts, r_min, r_max):
+    src = rotate([0, 0, 90])(
+        rotate([90, 0, 0])(
+            linear_extrude(height=r_max-r_min,
+                           convexity=4)(polygon(pts))
+        )
+    )
+    xmin = min([e[0] for e in pts])
+    xmax = max([e[0] for e in pts])
+    ymin = min([e[1] for e in pts])
+    ymax = max([e[1] for e in pts])
+    x_range = (xmax-xmin)
+    y_range = (ymax-ymin)
+    a_range = x_range / r_min
+    a_step = math.radians(2.0)
+    x_step = x_range * a_step/a_range
+    a_min = xmin/r_min
+    l = []
+    a = a_min
+
+    while a < a_min + a_range + a_step:
+        offset_x = xmin + x_range * (a - a_min) / a_range
+        cut = translate([-1, -x_step/2, ymin-1])(
+            cube([r_max-r_min+2, x_step, y_range+2])
+        )
+        section = rotate([0,0,math.degrees(a)])(
+            translate([r_min, 0,0])(
+                intersection()(
+                    translate([0.0, -offset_x, 0])(src),
+                    cut
+                )
+            )
+        )
+        l.append(section)
+        a += a_step
+
+    if len(l) > 1:
+        l2 = []
+        for i in range(len(l) - 1):
+            l2.append(hull()(l[i], l[i+1]))
+    else:
+        l2 = l    
+    return union()(l2)
+
+
+def fit_to_radius(shape, xmin, xmax, ymin, ymax, r_min, z_max,
+                  a_step = math.radians(2.0)):
+    shape = rotate([0, 0, 90])(
+        rotate([90, 0, 0])(
+            shape
+        )
+    )
+    x_range = (xmax-xmin)
+    y_range = (ymax-ymin)
+    a_range = x_range / r_min
+    x_step = x_range * a_step/a_range
+    a_min = xmin/r_min
+    l = []
+    a = a_min
+
+    while a < a_min + a_range + a_step:
+        offset_x = xmin + x_range * (a - a_min) / a_range
+        cut = translate([-1, -x_step/2, ymin-1])(
+            cube([z_max+2, x_step, y_range+2])
+        )
+        section = rotate([0,0,math.degrees(a)])(
+            translate([r_min, 0,0])(
+                intersection()(
+                    translate([0.0, -offset_x, 0])(shape),
+                    cut
+                )
+            )
+        )
+        l.append(section)
+        a += a_step
+
+    if len(l) > 1:
+        l2 = []
+        for i in range(len(l) - 1):
+            l2.append(hull()(l[i], l[i+1]))
+    else:
+        l2 = l    
+    return union()(l2)
+
+
+def chamfer_edge(shape, pt1, pt2, radius, face_vec):
+    #print pt1, pt2
+    direction = np.array([pt2[0] - pt1[0],
+                          pt2[1] - pt1[1],
+                          pt2[2] - pt1[2]])
+    l = np.linalg.norm(direction)
+    if l < 1e-6:
+        print "Warning ignoring request to fillet zero-length edge", pt1, pt2
+        return shape
+    chamfer = translate([-radius,0, 0])(
+        difference()(
+            rotate([0,0,-45])(
+                translate([0,0,-1])(
+                    cube([2*radius, 2*radius, l+2.0]),
+                )
+            )
+        )
+    )
+    #return chamfer
+    #chamfer located at origin, along z axis, with region to be
+    #chamfer in neg X and neg Y.  Remap axes via transformation
+    #matrix
+    direction = direction / np.linalg.norm(direction)
+    face_vec = np.array(face_vec)
+    face_vec = face_vec / np.linalg.norm(face_vec)
+    face_vec2 = np.cross(face_vec, direction)#, face_vec)
+    #print direction, face_vec, face_vec2
+    chamfer = multmatrix(m = [[face_vec[0], face_vec2[0], direction[0], 0.0],
+                              [face_vec[1], face_vec2[1], direction[1], 0.0],
+                              [face_vec[2], face_vec2[2], direction[2], 0.0],
+                              [0.0, 0.0, 0.0, 1.0]])(chamfer)
+    
+    return difference()(
+        shape,
+        translate([pt1[0], pt1[1], pt1[2]])(chamfer)
+    )
+
+def fillet_edge(shape, pt1, pt2, radius, face_vec):
+    #print pt1, pt2
+    direction = np.array([pt2[0] - pt1[0],
+                          pt2[1] - pt1[1],
+                          pt2[2] - pt1[2]])
+    l = np.linalg.norm(direction)
+    if l < 1e-6:
+        print "Warning ignoring request to fillet zero-length edge", pt1, pt2
+        return shape
+    fillet = translate([-radius,-radius, 0])(
+        difference()(
+            translate([0,0,-1])(
+                cube([2*radius, 2*radius, l+2.0]),
+            ),
+            translate([0,0,-2.0])(
+                cylinder(r=radius, h=l+4.0)
+            )
+        )
+    )
+    #fillet located at origin, along z axis, with region to be
+    #filleted in neg X and neg Y.  Remap axes via transformation
+    #matrix
+    direction = direction / np.linalg.norm(direction)
+    face_vec = np.array(face_vec)
+    face_vec = face_vec / np.linalg.norm(face_vec)
+    face_vec2 = np.cross(face_vec, direction)#, face_vec)
+    #print direction, face_vec, face_vec2
+    fillet = multmatrix(m = [[face_vec[0], face_vec2[0], direction[0], 0.0],
+                             [face_vec[1], face_vec2[1], direction[1], 0.0],
+                             [face_vec[2], face_vec2[2], direction[2], 0.0],
+                             [0.0, 0.0, 0.0, 1.0]])(fillet)
+    
+    return difference()(
+        shape,
+        translate([pt1[0], pt1[1], pt1[2]])(fillet)
+    )
+
+
+def vert_rounded_cube(dims, radius):
+    r = cube(dims)
+    r = fillet_edge(r,
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, dims[2]],
+                    radius,
+                    [0.0, -1.0, 0.0])
+    r = fillet_edge(r,
+                    [dims[0], 0.0, 0.0],
+                    [dims[0], 0.0, dims[2]],
+                    radius,
+                    [1.0, 0.0, 0.0])
+    r = fillet_edge(r,
+                    [0.0, dims[1], 0.0],
+                    [0.0, dims[1], dims[2]],
+                    radius,
+                    [-1.0, 0.0, 0.0])
+    r = fillet_edge(r,
+                    [dims[0], dims[1], 0.0],
+                    [dims[0], dims[1], dims[2]],
+                    radius,
+                    [0.0, 1.0, 0.0])
+
+    return r
+
+def rounded_cube(dims, radius):
+    c1 = translate([0,0,radius])(
+        vert_rounded_cube([dims[0], dims[1], dims[2] - 2*radius], radius)
+    )
+    c2 = translate([0,dims[1]-radius,0])(
+        rotate([90, 0, 0])(
+            vert_rounded_cube([dims[0], dims[2], dims[1] - 2*radius], radius)
+        )
+    )
+    c3 = translate([dims[0]-radius,0,0])(
+        rotate([00, -90, 0])(
+            vert_rounded_cube([dims[2], dims[1], dims[0] - 2*radius], radius)
+        )
+    )
+    x1 = radius
+    y1 = radius
+    z1 = radius
+    x2 = dims[0] - radius
+    y2 = dims[1] - radius
+    z2 = dims[2] - radius
+    
+    s = sphere(radius)
+    return union()(
+        c1,
+        c2,
+        c3,
+        [translate([c[0],c[1],c[2]])(s) for c in [
+            [x1, y1, z1],
+            [x1, y1, z2],
+            [x1, y2, z1],
+            [x1, y2, z2],
+            [x2, y1, z1],
+            [x2, y1, z2],
+            [x2, y2, z1],
+            [x2, y2, z2]]]
+        
+    )
+
+    
 def make_routed_slot(pts, tool_dia):
     import shapely
     import shapely.geometry
     l = shapely.geometry.LineString(pts)
-    p = l.buffer(distance=tool_dia/2, resolution=2)#, cap_style=1, join_style=1)
+    p = l.buffer(distance=tool_dia/2, resolution=10)
+    #, cap_style=1, join_style=1)
     pts = [(e[0],e[1]) for e in p.exterior.coords]
     return pts
+
+
+def make_catch(engage_dist, width, catch_depth, depth,
+               peak_height=None):
+    if peak_height is None:
+        peak_height = catch_depth*2
+    pts = [
+        [0.0, 0.0],
+        [0.0, engage_dist],
+        [-catch_depth, engage_dist-0.1],
+        [-catch_depth, engage_dist+catch_depth],
+        [0.0, engage_dist+peak_height],
+        [depth*0.9, engage_dist+catch_depth],
+        [depth*1.1, 0.0],
+    ]
+    catch = linear_extrude(height=width, convexity=4)(polygon(pts))
+    catch = rotate([90,0,0])(translate([0,0,-width/2])(catch))
+    return catch
+        
 
 class AssemblyBase(object):
 
@@ -244,6 +489,20 @@ def rotate_points(pts, angle):
         r.append([nx, ny])
     return r
 
+
+def rounded_slot(length, width, height):
+    u = union()(
+        translate([0, -width/2, 0])(
+            cube([length, width, height]),
+        ),
+        cylinder(r=width/2, h=height),
+        translate([length,0,0])(
+            cylinder(r=width/2, h=height),
+        )
+    )
+    return u
+
+    
 
 class GenericRectangularPrism(AssemblyBase):
     def __init__(self, name, data={}):
@@ -925,6 +1184,8 @@ class LM10UU(AssemblyBase):
 def nema(size=23, l=76.0, shaft_dia=8.0):
     if size == 23:
         w = 57.0
+    elif size == 34:
+        w = 86.0
     else:
         raise NotImplementedError
 
@@ -1289,6 +1550,7 @@ class MetricNut(AssemblyBase):
         self.inner_r = float(self.data['thread_size'])/2
         code = int(float(self.data['thread_size'] * 10) + 0.5)
         self.outer_r = {
+            10 : 2.887,
             16 : 3.41,
             20 : 4.32,
             25 : 5.45,
@@ -1304,6 +1566,7 @@ class MetricNut(AssemblyBase):
             200 : 32.95
         }[code] / 2
         self.height = {
+            10 : 1.0,
             16 : 1.3,
             20 : 1.6,
             25 : 2.0,
@@ -1318,6 +1581,10 @@ class MetricNut(AssemblyBase):
             160 : 14.8,
             200 : 18.0
         }[code]
+        self.height = self.height * self.data.get('height_scale', 1.0)
+        self.data['height'] = self.height
+        self.data['outer_dia'] = self.outer_r * 2
+        self.data['outer_r'] = self.outer_r
         return True
         
     def generate(self):
