@@ -17,7 +17,7 @@ import numpy as np
 
 aluminium_colour = [0.77, 0.77, 0.8]
 steel_colour = [0.7, 0.7, 0.7]#[0.8, 0.8, 0.8]
-
+copper_colour = [ 0.722, 0.451, 0.20]
 
 TransparentYellow = (1, 1, 0, 0.3)
 
@@ -245,7 +245,28 @@ def rounded_cube(dims, radius):
         
     )
 
-    
+
+def pipe(r_ext, r_int, l):
+    return difference()(
+        cylinder(r_ext, l),
+        translate([0,0,-0.1])(
+            cylinder(r_int, l+0.2)
+        )
+    )
+
+
+
+def rounded_cylinder(r, l):
+    return translate([0,0,-l/2])(
+        union()(
+            sphere(r),
+            cylinder(r, l),
+            translate([0,0,l])(
+                sphere(r)
+            )
+        )
+    )
+
 def make_routed_slot(pts, tool_dia):
     import shapely
     import shapely.geometry
@@ -259,14 +280,14 @@ def make_routed_slot(pts, tool_dia):
 def make_catch(engage_dist, width, catch_depth, depth,
                peak_height=None):
     if peak_height is None:
-        peak_height = catch_depth*2
+        peak_height = min(1.5, catch_depth*2)
     pts = [
         [0.0, 0.0],
         [0.0, engage_dist],
         [-catch_depth, engage_dist-0.1],
-        [-catch_depth, engage_dist+catch_depth],
+        [-catch_depth, engage_dist+peak_height/3],
         [0.0, engage_dist+peak_height],
-        [depth*0.9, engage_dist+catch_depth],
+        [depth*0.9, engage_dist+peak_height/2],
         [depth*1.1, 0.0],
     ]
     catch = linear_extrude(height=width, convexity=4)(polygon(pts))
@@ -292,7 +313,6 @@ class AssemblyBase(object):
         if self.calculating:
             child.calculate()
                             
-
     def add_children(self, *args):
         for a in args:
             if isinstance(a, (list,tuple)):
@@ -300,6 +320,16 @@ class AssemblyBase(object):
             else:
                 self.add_child(a)       
 
+    def find_child(self, name):
+        if self.identifier == name:
+            return self
+        else:
+            for c in self.children:
+                r = c.find_child(name)
+                if r is not None:
+                    return r
+        return None
+        
     def set_parent(self, parent):
         self.parent = parent
 
@@ -449,8 +479,10 @@ class AssemblyBase(object):
         pickle.dump(self.data, open(ofn, 'w'))
         scad_render_to_file(self.generate(),
                             filepath=ofn,
-                            include_orig_code=True,
-                            file_header='$fa = %s; $fn = %s;' % (40, 40))
+                            include_orig_code=False,#True,
+                            #file_header='$fa = %s; $fn = %s;' % (40, 40)
+                            file_header='$fs = 0.01;'
+        )
         for c in self.children:
             c.do_save_components(output_dir)
         
@@ -521,6 +553,26 @@ class GenericRectangularPrism(AssemblyBase):
         depth = self.get_data('depth')
         return color(colour)(cube([width, depth, height]))
 
+class GenericPipe(AssemblyBase):
+    def __init__(self, name, data={}):
+        defaults = {
+        }
+        defaults.update(data)
+        AssemblyBase.__init__(self, name, defaults)
+
+    def calculate(self):
+        return True
+
+    def generate(self):
+        colour = self.get_data('colour', Yellow)
+        return color(colour)(
+            pipe(
+                self.data['external_dia']/2,
+                self.data['internal_dia']/2,
+                self.data['length']
+            )
+        )
+
 class GenericDrilledPlate(AssemblyBase):
     def __init__(self, name, data={}):
         defaults = {            
@@ -533,10 +585,12 @@ class GenericDrilledPlate(AssemblyBase):
         width = self.get_data('width')
         depth = self.get_data('depth')
         drills = self.get_data('drills', [])
+        width_offset = self.get_data('width_offset', 0.0)
+        depth_offset = self.get_data('depth_offset', 0.0)
         for x,y,dia in drills:
-            if x < 0:
+            if x < 0 and self.get_data('remap_negative', True):
                 x = width + x
-            if y < 0:
+            if y < 0 and self.get_data('remap_negative', True):
                 y = depth + y
             nd.append([x,y,dia])
         self.data['drills'] = nd
@@ -547,8 +601,12 @@ class GenericDrilledPlate(AssemblyBase):
         width = self.get_data('width')
         height = self.get_data('height')
         depth = self.get_data('depth')
+        width_offset = self.get_data('width_offset', 0.0)
+        depth_offset = self.get_data('depth_offset', 0.0)
         drills = self.get_data('drills', [])
-        u = cube([width, depth, height])
+        u = translate([width_offset, depth_offset, 0.0])(
+            cube([width, depth, height])
+        )
         dl = []
         for x,y,dia in drills:
             dl.append(translate([x,y,-1])(cylinder(r=float(dia)/2,
@@ -1182,7 +1240,9 @@ class LM10UU(AssemblyBase):
     
 
 def nema(size=23, l=76.0, shaft_dia=8.0):
-    if size == 23:
+    if size == 17:
+        w = 42.0
+    elif size == 23:
         w = 57.0
     elif size == 34:
         w = 86.0
